@@ -93,7 +93,4 @@ async def ending(message: Message):
     await message.answer(f'Игра окончена. Ваш результат: {scores}/{max_scores}')
 
 async def remove_inline_keyboard(message: Message):
-
-    await bot.edit_message_reply_markup(chat_id=message.chat.id,
-
-        message_id=message.message_id)
+    await bot.edit_message_reply_markup(chat_id=message.chat.id,message_id=message.message_id)
