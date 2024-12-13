@@ -17,6 +17,7 @@ max_scores = 0
 async def cmd_start(message: Message):
     global data, max_scores
     data = []
+    max_scores = 0
     await message.answer('Добро пожаловать!', reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text='Начать')]], resize_keyboard=True, one_time_keyboard=True))
     with open('app/Вопросы для викторины.txt', 'r', encoding='UTF-8') as file:
         n = int(file.readline())
@@ -57,7 +58,7 @@ async def right(callback: CallbackQuery):
     global scores
     await callback.answer('')
     await remove_inline_keyboard(callback.message)
-    await callback.message.answer(f'Ваш ответ: {}. Это правильный ответ.')
+    await callback.message.answer(f'Это правильный ответ.')
     scores += res[question_count-1]['cost']
     await my_func(callback.message)
 
@@ -65,7 +66,7 @@ async def right(callback: CallbackQuery):
 async def wrong(callback: CallbackQuery):
     await callback.answer('')
     await remove_inline_keyboard(callback.message)
-    await callback.message.answer(f'Ваш ответ: {}. Это неправильный ответ. Правильный ответ: {res[question_count-1]['correct']}')
+    await callback.message.answer(f'Это неправильный ответ. Правильный ответ: {res[question_count-1]['correct']}')
     await my_func(callback.message)
 
 
