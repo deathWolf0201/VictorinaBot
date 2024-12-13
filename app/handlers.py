@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 import app.quiz as quiz
 from aiogram import Router, F
 from aiogram.filters import CommandStart
