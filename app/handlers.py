@@ -20,7 +20,7 @@ async def cmd_start(message: Message):
     max_scores = 0
     await message.answer('Добро пожаловать! Нажмите "Начать", чтобы приступить к тестированию. Внимание: тестирование проходится только 1 раз.', reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text='Начать')]], resize_keyboard=True, one_time_keyboard=True))
     with open('app/Вопросы для викторины.txt', 'r', encoding='UTF-8') as file:
-        n = int(file.readline())
+        n = int(file.readline().split()[-1])
         for i in range(n):
             quest = dict()
             quest['question'] = file.readline()[:-1]
