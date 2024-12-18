@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-
+from aiogram.exceptions import TelegramBadRequest
 import app.quiz as quiz
 from aiogram import Router, F
 from aiogram.filters import CommandStart
@@ -12,19 +12,20 @@ router = Router()
 data = []
 res = []
 max_scores = 0
+total_questions = 0
 @router.message(CommandStart())
 async def cmd_start(message: Message):
-    await rq.set_user(message.from_user.id, message.from_user.first_name+" "+message.from_user.last_name)
-    global data, max_scores
+    global data, max_scores, total_questions, res
     data = []
     max_scores = 0
-    await message.answer('Добро пожаловать! Нажмите "Начать", чтобы приступить к тестированию. Внимание: тестирование проходится только 1 раз.', reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text='Начать')]], resize_keyboard=True, one_time_keyboard=True))
     with open('app/Вопросы для викторины.txt', 'r', encoding='UTF-8') as file:
-        n = int(file.readline().split()[-1])
-        for i in range(n):
+        total_questions = int(file.readline().split()[-1])
+        for i in range(total_questions):
             quest = dict()
             quest['question'] = file.readline()[:-1]
-            quest['cost'] = int(quest['question'].split()[-2][1:])
+            quest['cost'] = 1
+            if quest['question'].endswith(')'):
+                quest['cost'] = int(quest['question'].split()[-2][1:])
             quest['answers'] = []
             x = file.readline()
             while not x.startswith('Правильный ответ'):
@@ -35,62 +36,95 @@ async def cmd_start(message: Message):
                 quest['correct'] = quest['correct'][:-1]
             data.append(quest)
             max_scores += quest['cost']
+    if res != data:
+        res = data.copy()
+        if message.from_user.last_name is not None:
+            await rq.set_default(message.from_user.id, message.from_user.first_name+" "+message.from_user.last_name)
+        else:
+            await rq.set_default(message.from_user.id, message.from_user.first_name)
+    else:
+        if message.from_user.last_name is not None:
+            await rq.set_user(message.from_user.id, message.from_user.first_name + " " + message.from_user.last_name)
+        else:
+            await rq.set_user(message.from_user.id, message.from_user.first_name)
+
+    if await rq.get_is_passed(message.from_user.id):
+        await message.answer(f'Второй раз проходить тот же тест нельзя. Ваш результат {await rq.get_scores(message.from_user.id)}/{max_scores} баллов', reply_markup=ReplyKeyboardRemove())
+        return
+    if await rq.get_is_passing(message.from_user.id):
+        message_id = await rq.get_last_message_id(message.from_user.id)
+        await remove_inline_keyboard(chat_id=message.from_user.id,message_id=message_id)
+        await message.answer(
+            f'Вы уже проходите тестирование. Вы остановились на {await rq.get_question_count(message.from_user.id)} вопросе из {total_questions}. Нажмите "Продолжить"',
+            reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text='Продолжить')]], resize_keyboard=True,
+                                             one_time_keyboard=True))
+        return
+    else:
+        await message.answer('Добро пожаловать! Нажмите "Начать", чтобы приступить к тестированию. Внимание: тестирование проходится только 1 раз.', reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text='Начать')]], resize_keyboard=True, one_time_keyboard=True))
+
 
 
 @router.message(F.text == 'Начать')
 async def begin(message: Message):
     global res, max_scores
-    if res != data:
-        res = data.copy()
-        await rq.set_default(message.from_user.id)
-    if await rq.get_is_passed(message.from_user.id):
-        await message.answer(f'Второй раз проходить тот же тест нельзя. Ваш результат {await rq.get_scores(message.from_user.id)}/{max_scores}', reply_markup=ReplyKeyboardRemove())
-        return
+
+
     if await rq.get_is_passing(message.from_user.id):
+        await my_func(message)
         return
+
     await rq.set_is_passing(message.from_user.id)
     await my_func(message)
 
 @router.callback_query(F.data == "True")
 async def right(callback: CallbackQuery):
     await callback.answer('')
-    await remove_inline_keyboard(callback.message)
-    await callback.message.answer(f'Это правильный ответ. Нажмите "Далее", чтобы перейти к следующему вопросу.', reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text='Далее')]], resize_keyboard=True, one_time_keyboard=True))
+    await remove_inline_keyboard(callback.from_user.id, callback.message.message_id)
+    await callback.message.answer(f'Это правильный ответ.')
     await rq.set_scores(callback.from_user.id, res[await rq.get_question_count(callback.from_user.id)-1]['cost'])
-
+    if await rq.get_question_count(callback.from_user.id) == len(data):
+        await ending(callback.from_user.id)
+    else:
+        await rq.set_question_count(callback.from_user.id, 1)
+        await callback.message.answer(f'Нажмите "Далее", чтобы перейти к следующему вопросу.', reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text='Далее')]], resize_keyboard=True, one_time_keyboard=True))
 
 @router.callback_query(F.data == "False")
 async def wrong(callback: CallbackQuery):
     await callback.answer('')
-    await remove_inline_keyboard(callback.message)
-    await callback.message.answer(f'Это неправильный ответ. Правильный ответ: {res[await rq.get_question_count(callback.from_user.id)-1]['correct']}. Нажмите "Далее", чтобы перейти к следующему вопросу.', reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text='Далее')]], resize_keyboard=True, one_time_keyboard=True))
+    await remove_inline_keyboard(callback.from_user.id, callback.message.message_id)
+    await callback.message.answer(f'Это неправильный ответ. Правильный ответ: {res[await rq.get_question_count(callback.from_user.id)-1]['correct']}.')
+    if await rq.get_question_count(callback.from_user.id) == len(data):
+        await ending(callback.from_user.id)
+    else:
+        await rq.set_question_count(callback.from_user.id, 1)
+        await callback.message.answer(f'Нажмите "Далее", чтобы перейти к следующему вопросу.', reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text='Далее')]], resize_keyboard=True, one_time_keyboard=True))
 
-
-
+@router.message(F.text == 'Продолжить')
 @router.message(F.text == 'Далее')
 async def my_func(message: Message):
-    if await rq.get_question_count(message.from_user.id) < len(data):
-        await rq.set_question_count(message.from_user.id, 1)
-        question = res[await rq.get_question_count(message.from_user.id)-1]['question']
-        correct = res[await rq.get_question_count(message.from_user.id)-1]['correct']
-        cost = res[await rq.get_question_count(message.from_user.id)-1]['cost']
-        inline_keyboard = []
-        quest1 = quiz.Question(question, [], cost)
-        for element in res[await rq.get_question_count(message.from_user.id)-1]['answers']:
-            quest1.answers.append(quiz.Answer(text=element, correct=element==correct))
-            inline_keyboard.append([InlineKeyboardButton(text=quest1.answers[-1].text, callback_data=f"{quest1.answers[-1].correct}")])
-        await message.answer(quest1.text, reply_markup=InlineKeyboardMarkup(inline_keyboard=inline_keyboard))
-
-    else:
-        await ending(message)
+    if await rq.get_last_message_id(message.from_user.id) > 0:
+        await remove_inline_keyboard(chat_id=message.from_user.id, message_id=await rq.get_last_message_id(message.from_user.id))
+    question = res[await rq.get_question_count(message.from_user.id)-1]['question']
+    correct = res[await rq.get_question_count(message.from_user.id)-1]['correct']
+    cost = res[await rq.get_question_count(message.from_user.id)-1]['cost']
+    inline_keyboard = []
+    quest1 = quiz.Question(question, [], cost)
+    for element in res[await rq.get_question_count(message.from_user.id)-1]['answers']:
+        quest1.answers.append(quiz.Answer(text=element, correct=element==correct))
+        inline_keyboard.append([InlineKeyboardButton(text=quest1.answers[-1].text, callback_data=f"{quest1.answers[-1].correct}")])
+    msg = await message.answer(f"{await rq.get_question_count(message.from_user.id)}/{len(data)}\n"+quest1.text, reply_markup=InlineKeyboardMarkup(inline_keyboard=inline_keyboard))
+    await rq.set_last_message_id(message.from_user.id, msg.message_id)
 
 @router.message()
 async def wrong_message(message: Message):
     await message.answer('Простите, ваша команда не распознана')
 
-async def ending(message: Message):
-    await rq.set_is_passed(message.from_user.id)
-    await message.answer(f'Игра окончена. Ваш результат: {await rq.get_scores(message.from_user.id)}/{max_scores}', reply_markup=ReplyKeyboardRemove())
+async def ending(tg_id):
+    await rq.set_is_passed(tg_id)
+    await bot.send_message(text=f'Викторина завершена. Ваш результат: {await rq.get_scores(tg_id)}/{max_scores} баллов.', reply_markup=ReplyKeyboardRemove(), chat_id=tg_id)
 
-async def remove_inline_keyboard(message: Message):
-    await bot.edit_message_reply_markup(chat_id=message.chat.id,message_id=message.message_id)
+async def remove_inline_keyboard(chat_id, message_id):
+    try:
+        await bot.edit_message_reply_markup(chat_id=chat_id,message_id=message_id)
+    except TelegramBadRequest:
+        return

@@ -14,6 +14,7 @@ class User(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     tg_id = mapped_column(BigInteger)
     user_name: Mapped[str] = mapped_column(String(100))
+    last_message_id: Mapped[int] = mapped_column()
     question_count: Mapped[int] = mapped_column(BigInteger)
     scores: Mapped[int] = mapped_column(BigInteger)
     is_passing: Mapped[bool] = mapped_column()
