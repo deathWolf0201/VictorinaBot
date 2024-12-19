@@ -112,7 +112,7 @@ async def my_func(message: Message):
     for element in res[await rq.get_question_count(message.from_user.id)-1]['answers']:
         quest1.answers.append(quiz.Answer(text=element, correct=element==correct))
         inline_keyboard.append([InlineKeyboardButton(text=quest1.answers[-1].text, callback_data=f"{quest1.answers[-1].correct}")])
-    msg = await message.answer(f"{await rq.get_question_count(message.from_user.id)}/{len(data)}\n"+quest1.text, reply_markup=InlineKeyboardMarkup(inline_keyboard=inline_keyboard))
+    msg = await message.answer(f"<i><b>{await rq.get_question_count(message.from_user.id)}/{len(data)}</b></i>\n"+quest1.text, reply_markup=InlineKeyboardMarkup(inline_keyboard=inline_keyboard), parse_mode='HTML')
     await rq.set_last_message_id(message.from_user.id, msg.message_id)
 
 @router.message()
@@ -121,7 +121,12 @@ async def wrong_message(message: Message):
 
 async def ending(tg_id):
     await rq.set_is_passed(tg_id)
-    await bot.send_message(text=f'Викторина завершена. Ваш результат: {await rq.get_scores(tg_id)}/{max_scores} баллов.', reply_markup=ReplyKeyboardRemove(), chat_id=tg_id)
+    if await rq.get_scores(tg_id)/max_scores*100 > 86:
+        await bot.send_message(
+            text=f'Викторина завершена. Ваш результат: {await rq.get_scores(tg_id)}/{max_scores} баллов. Поздравляем вас с результатом! Можете подойти на ресепшн за призом!',
+            reply_markup=ReplyKeyboardRemove(), chat_id=tg_id)
+    else:
+        await bot.send_message(text=f'Викторина завершена. Ваш результат: {await rq.get_scores(tg_id)}/{max_scores} баллов. Спасибо, что поучаствовали в нашей викторине! К сожалению, вам не хватило баллов, чтобы получить приз.', reply_markup=ReplyKeyboardRemove(), chat_id=tg_id)
 
 async def remove_inline_keyboard(chat_id, message_id):
     try:
