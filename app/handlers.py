@@ -60,7 +60,7 @@ async def cmd_start(message: Message):
                                              one_time_keyboard=True))
         return
     else:
-        await message.answer('Добро пожаловать! Нажмите "Начать", чтобы приступить к тестированию. Внимание: тестирование проходится только 1 раз.', reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text='Начать')]], resize_keyboard=True, one_time_keyboard=True))
+        await message.answer('Добро пожаловать на Кванторину! Ответьте правильно более чем на 12 вопросов и заберите памятный сувенир от Кванториума. Нажмите "Начать", чтобы приступить к тестированию. <b>Внимание</b>: у вас будет только одна попытка.', reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text='Начать')]], resize_keyboard=True, one_time_keyboard=True), parse_mode='HTML')
 
 
 
