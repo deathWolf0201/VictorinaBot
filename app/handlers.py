@@ -3,7 +3,7 @@ from aiogram import Router, F
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import CommandStart
 from aiogram.types import (Message, ReplyKeyboardMarkup, InlineKeyboardButton,
-                           KeyboardButton, InlineKeyboardMarkup, CallbackQuery, ReplyKeyboardRemove)
+                           KeyboardButton, InlineKeyboardMarkup, CallbackQuery, ReplyKeyboardRemove, FSInputFile)
 
 import app.database.requests as rq
 import app.quiz as quiz
@@ -67,7 +67,7 @@ async def cmd_start(message: Message):
         return
     else:
         await message.answer(
-            'Добро пожаловать на Кванторину! Ответьте правильно более чем на 8 вопросов и заберите памятный сувенир от Кванториума. Нажмите "Начать", чтобы приступить к тестированию. <b>Внимание</b>: у вас будет только одна попытка.',
+            'Добро пожаловать на викторину "Уголки России: ЕАО"! Ответьте правильно на 7 или более вопросов и заберите приз от Кванториума. Нажмите "Начать", чтобы приступить к тестированию.  <b>Внимание</b>: у вас будет только одна попытка. Удачи!',
             reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text='Начать')]], resize_keyboard=True,
                                              one_time_keyboard=True), parse_mode='HTML')
 
@@ -142,11 +142,13 @@ async def wrong_message(message: Message):
 
 async def ending(tg_id):
     await rq.set_is_passed(tg_id)
-    if await rq.get_scores(tg_id) / max_scores * 100 > 86:
+    if await rq.get_scores(tg_id) / max_scores * 100 >= 70:
+        await bot.send_photo(chat_id=tg_id, photo=FSInputFile("./photos/win.jpg"))
         await bot.send_message(
             text=f'Викторина завершена. Ваш результат: {await rq.get_scores(tg_id)}/{max_scores} баллов. Поздравляем вас с результатом!',
             reply_markup=ReplyKeyboardRemove(), chat_id=tg_id)
     else:
+        await bot.send_photo(chat_id=tg_id, photo=FSInputFile("./photos/lose.jpg"))
         await bot.send_message(
             text=f'Викторина завершена. Ваш результат: {await rq.get_scores(tg_id)}/{max_scores} баллов. Спасибо, что поучаствовали в нашей викторине! К сожалению, вам не хватило баллов до победы.',
             reply_markup=ReplyKeyboardRemove(), chat_id=tg_id)
